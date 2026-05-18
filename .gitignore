@@ -1,0 +1,22 @@
+# Entorno de Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+api.env
+.env
+
+# IDEs y Editores
+.vscode/
+.idea/
+
+# Modelos de Machine Learning (se generan en ejecución)
+*.joblib
+*.pkl
+
+# Limpieza de documentación y base de datos
+# Ignora todos los .md excepto el README
+*.md
+!README.md
+*.sql
+*.log

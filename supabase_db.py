@@ -207,9 +207,14 @@ class TaskGenerationLock:
                 else:
                     locked_time = datetime.fromisoformat(locked_time_str)
                     elapsed = (datetime.now() - locked_time).total_seconds()
-
                     if elapsed < TaskGenerationLock.LOCK_TIMEOUT_SECONDS:
                         return False  # Lock aún válido
+
+            # Adquirir lock
+            res = supabase.table("task_generation_lock").update({
+                "process_id": process_id,
+                "locked_at": datetime.now().isoformat(),
+                "running": True
             }).eq("id", 1).execute()
 
             # Retorna True solo si se actualizó la fila correctamente

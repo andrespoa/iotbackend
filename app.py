@@ -198,33 +198,46 @@ def api_analisis_inteligente():
     """
     try:
         # Obtener clave de Gemini de query params (opcional)
-        gemini_key = request.args.get("gemini_key", "").strip()
+        gemini_key = request.args.get("gemini_key", "").strip() or GEMINI_API_KEY
         
         # 1) Realizar análisis avanzado
-        analysis = predictor.analyze_environmental_data(gemini_key=gemini_key if gemini_key else None)
+        analysis = predictor.analyze_environmental_data(gemini_key=gemini_key)
         
         if not analysis.get("ok"):
             logger.warning(f"Analysis failed: {analysis.get('msg')}")
             return jsonify({"ok": False, "msg": analysis.get("msg")}), 400
         
-        # 2) Generar tareas inteligentes basadas en análisis
+        # 2) Generar tareas inteligentes basadas en el análisis actual
         tasks = predictor.generate_tasks_from_analysis()
         logger.info(f"Generated {len(tasks)} tasks")
         
-        # 3) Extraer información para frontend
+        # 3) Limpiar datos (convertir tipos numpy) antes de guardar o responder
         analysis_data = analysis.get("analysis", {})
-        risk_assessment = analysis_data.get("risk_assessment", {})
+        analysis_data_clean = convert_numpy_to_python(analysis_data)
+        tasks_clean = convert_numpy_to_python(tasks)
         
-        # Extraer factores de riesgo legibles
-        risk_factors = risk_assessment.get("factors_list", [])
-        ai_explanation = analysis_data.get("ai_explanation", "")
+        # 4) PERSISTENCIA: Guardar análisis y tareas en la base de datos
+        try:
+            save_data = {
+                "analysis": analysis_data_clean,
+                "summary": analysis_data_clean.get("risk_assessment", {})
+            }
+            predictor.save_pronostico_and_tasks_smart(
+                save_data, 
+                tasks_clean, 
+                check_duplicates=True,
+                process_id="api-analisis-inteligente"
+            )
+            logger.info("Análisis inteligente persistido correctamente en Supabase")
+        except Exception:
+            logger.exception("Error al persistir análisis inteligente")
+
+        # 5) Extraer información final para la respuesta
+        risk_assessment = analysis_data_clean.get("risk_assessment", {})
+        risk_factors_clean = risk_assessment.get("factors_list", [])
+        ai_explanation = analysis_data_clean.get("ai_explanation", "")
         confidence = risk_assessment.get("confidence", 0.8)
         
-        # 4) Retornar análisis + tareas + explicación
-        # Convertir valores numpy a tipos nativos de Python para JSON
-        analysis_data_clean = convert_numpy_to_python(analysis_data)
-        risk_factors_clean = convert_numpy_to_python(risk_factors)
-        tasks_clean = convert_numpy_to_python(tasks)
         confidence_clean = float(confidence) if confidence else 0.5
         
         response = {

@@ -188,22 +188,33 @@ class TaskGenerationLock:
             response = supabase.table("task_generation_lock").select("*").eq("id", 1).execute()
             lock = response.data[0] if response.data else None
 
+            if not lock:
+                # Si no existe la fila inicial con id=1, intentamos crearla para adquirir el lock
+                try:
+                    supabase.table("task_generation_lock").insert({
+                        "id": 1, "process_id": process_id, "locked_at": datetime.now().isoformat(), "running": True
+                    }).execute()
+                    return True
+                except Exception:
+                    return False
+
             if lock and lock.get("process_id"):
                 # Hay un lock activo, verificar si expiró
-                locked_time = datetime.fromisoformat(lock["locked_at"])
-                elapsed = (datetime.now() - locked_time).total_seconds()
+                locked_time_str = lock.get("locked_at")
+                if not locked_time_str:
+                    # Si no hay fecha registrada, permitimos tomar el control
+                    pass
+                else:
+                    locked_time = datetime.fromisoformat(locked_time_str)
+                    elapsed = (datetime.now() - locked_time).total_seconds()
 
-                if elapsed < TaskGenerationLock.LOCK_TIMEOUT_SECONDS:
-                    return False  # Lock aún válido
-
-            # Adquirir lock
-            supabase.table("task_generation_lock").update({
-                "process_id": process_id,
-                "locked_at": datetime.now().isoformat(),
-                "running": True
+                    if elapsed < TaskGenerationLock.LOCK_TIMEOUT_SECONDS:
+                        return False  # Lock aún válido
             }).eq("id", 1).execute()
 
-            return True
+            # Retorna True solo si se actualizó la fila correctamente
+            return len(res.data) > 0
+            
         except Exception as e:
             LOG.error(f"Error al adquirir lock: {e}")
             return False

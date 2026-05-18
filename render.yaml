@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: iotbackend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MODEL_PATH
+        value: /opt/render/project/src/model_rf.joblib
